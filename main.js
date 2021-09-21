@@ -105,10 +105,23 @@
             scrollHeight: 0,
             objs: {
                 container: document.querySelector('#scroll-section-3'),
-                canvasCaption: document.querySelector('.canvas-caption')
+                canvasCaption: document.querySelector('.canvas-caption'),
+                canvas : document.querySelector('.image-blend-canvas'),
+                context  : document.querySelector('.image-blend-canvas').getContext('2d'),
+                imagesPath : [
+                    './images/blend-image-1.jpg',
+                    './images/blend-image-2.jpg',
+                ],
+                images : []
             },
             values: {
-    
+                rect1X : [0, 0, {start : 0, end : 0}],
+                rect2X : [0, 0, {start : 0, end : 0}], 
+                blendHeight : [0, 0, {start : 0, end : 0}],
+                canvas_scale : [0, 0, {start : 0, end : 0}],
+                canvasCaption_opacity :[0, 1, {start : 0, end : 0}],
+                canvasCaption_translateY : [20, 0, {start : 0, end : 0}],
+                rectStartY : 0,
             }
         }
     ];
@@ -130,9 +143,24 @@
             imgElem2.src = `./video/002/IMG_${7027 + i}.JPG`;
             sceneInfo[2].objs.videoImages.push(imgElem2); 
         }
+        let imgElem3
+        for(let i = 0 ; i < sceneInfo[3].objs.imagesPath.length ; i++) {
+            imgElem3 = new Image() 
+            imgElem3.src = sceneInfo[3].objs.imagesPath[i];
+            sceneInfo[3].objs.images.push(imgElem3); 
+        }
+
     }
     setCanvasImages()
 
+    function checkMenu() {
+        // yOffset은 문서 전체에서 스크롤된 위치 (현재 스크롤된 위치)
+        if(yOffset > 44) {
+            document.body.classList.add('local-nav-sticky');
+        }else {
+            document.body.classList.remove('local-nav-sticky');
+        }
+    }
 
     function setLayout() {
         // 각 스크롤 섹션의 높이 세팅
@@ -194,7 +222,7 @@
     function playAnimation() {
         const objs = sceneInfo[currentScene].objs;
         const values = sceneInfo[currentScene].values;
-        const currentYOffset = yOffset - preScrollHeight;
+        const currentYOffset = yOffset - preScrollHeight; // currentYOffset은 현재 씬에서 얼마나 스크롤 했는지 결정하는 변수
         const scrollHeight = sceneInfo[currentScene].scrollHeight;
         const scrollRatio = currentYOffset / scrollHeight;
 
@@ -294,11 +322,171 @@
                     objs.messageC.style.opacity = calcValues(values.messageC_opacity_out, currentYOffset);
                     objs.pinC.style.transform = `scaleY(${calcValues(values.pinC_scaleY, currentYOffset)})`;
                 }
-    
+                // currentScene 3에서 쓰는 캔버스를 미리 그려주기 시작
+                if(scrollRatio > 0.9) {
+                // case 2에서 3의 사진이 쓰이고 있기 때문에 변수(objs,values)도 case3에 맞춰 변경해 줘야한다. 
+                const objs = sceneInfo[3].objs;
+                const values = sceneInfo[3].values;
+                const widthRatio = window.innerWidth / objs.canvas.width;
+                const heightRatio = window.innerHeight / objs.canvas.height;
+                
+                let canvasScaleRatio;
+
+                if (widthRatio <= heightRatio) {
+                    //캔버스보다 브라우저 창이 홀쭉한 경우 
+                    canvasScaleRatio = heightRatio;
+                    // console.log("heightRatio")
+                }else {
+                    //캔버스보다 브라우저 창이 납작한 경우 
+                    canvasScaleRatio = widthRatio;
+                    // console.log('widthRatio') 
+                }
+                objs.canvas.style.transform = `scale(${canvasScaleRatio})`;
+                objs.context.fillStyle = 'white'; // 캔버스 색상 설정 
+                objs.context.drawImage(objs.images[0], 0, 0);
+
+                //캔버스 사이즈에 맞춰 가정한 innerWidth와 innerHeight 
+                // innerWidth는 스크롤바 까지 포함한 길이 여기선 제외돈 width를 구애햐 한다. 
+                // const recalculatedInnerWidth = window.innerWidth / canvasScaleRatio;
+                // document.body.offsetWidth -> 스크롤바를 제외한 width 길이 
+                const recalculatedInnerWidth = document.body.offsetWidth / canvasScaleRatio;
+                const recalculatedInnerHeight = window.innerHeight / canvasScaleRatio;
+
+                const whiteRectWidth = recalculatedInnerWidth * 0.15;
+                // [0] -> 출발값 [1] ->  애니메이션이 끝날 때 최종값 
+                values.rect1X[0] = (objs.canvas.width - recalculatedInnerWidth) / 2;             // 이동 전 처음 세팅된 상태 
+                values.rect1X[1] = values.rect1X[0] - whiteRectWidth;
+                values.rect2X[0] = values.rect1X[0] + recalculatedInnerWidth - whiteRectWidth;   // 이동 전 처음 세팅된 상태 
+                values.rect2X[1] = values.rect2X[0] + whiteRectWidth;
+
+                // 캔버스는 default가 검정색이다. 
+                // fillRect 캔버스에서 사각형을 그리는 메소드 
+                // 좌우 흰색 박스 그리기          x             y        width                     height
+                // objs.context.fillRect(values.rect1X[0], 0, parseInt(whiteRectWidth), objs.canvas.height);
+                // objs.context.fillRect(values.rect2X[0], 0, parseInt(whiteRectWidth), objs.canvas.height);
+                
+                objs.context.fillRect(parseInt(values.rect1X[0]), 0, parseInt(whiteRectWidth), objs.canvas.height); // x값을 스크롤 값에 따라서 갱신되도록 
+                objs.context.fillRect(parseInt(values.rect2X[0]), 0, parseInt(whiteRectWidth), objs.canvas.height); // 애니메이션 처리 
+                }
+
                 break;
     
             case 3:
                 // console.log('3 play');
+                let step = 0
+                // 가로 세로 모드 꽉 차게 하기 위해 여기서 세팅 (계산 필요)
+                const widthRatio = window.innerWidth / objs.canvas.width;
+                const heightRatio = window.innerHeight / objs.canvas.height;
+                
+                let canvasScaleRatio;
+                if (widthRatio <= heightRatio) {
+                    //캔버스보다 브라우저 창이 홀쭉한 경우 
+                    canvasScaleRatio = heightRatio;
+                    // console.log("heightRatio")
+                }else {
+                    //캔버스보다 브라우저 창이 납작한 경우 
+                    canvasScaleRatio = widthRatio;
+                    // console.log('widthRatio') 
+                }
+                objs.canvas.style.transform = `scale(${canvasScaleRatio})`;
+                objs.context.drawImage(objs.images[0], 0, 0);
+                objs.context.fillStyle = 'white'; // 캔버스 색상 설정 
+
+                //캔버스 사이즈에 맞춰 가정한 innerWidth와 innerHeight 
+                // innerWidth는 스크롤바 까지 포함한 길이 여기선 제외돈 width를 구애햐 한다. 
+                // const recalculatedInnerWidth = window.innerWidth / canvasScaleRatio;
+                // document.body.offsetWidth -> 스크롤바를 제외한 width 길이 
+                const recalculatedInnerWidth = document.body.offsetWidth / canvasScaleRatio;
+                const recalculatedInnerHeight = window.innerHeight / canvasScaleRatio;
+
+                // getBoundingClientRect = 화면상에 있는 크기와 위치를 가져오는 메소드 
+                if(!values.rectStartY) {
+                    // values.rectStartY = objs.canvas.getBoundingClientRect().top; // -> 속도에 따라서 값이 변하기 때문에 항상 고정되는 값이 아니다. 
+                    // 위 방법은 값이 고정되지 않아서 아래의 방법을 사용 offsetTop은 계산이 복잡하다. 
+                    values.rectStartY = objs.canvas.offsetTop + (objs.canvas.height - objs.canvas.height * canvasScaleRatio) / 2 ; 
+                    values.rect1X[2].start = ( window.innerHeight / 2 ) / scrollHeight;
+                    values.rect2X[2].start = ( window.innerHeight / 2 ) / scrollHeight;
+                    values.rect1X[2].end = values.rectStartY / scrollHeight;
+                    values.rect2X[2].end = values.rectStartY / scrollHeight;
+                }
+                
+
+
+                const whiteRectWidth = recalculatedInnerWidth * 0.15;
+                // [0] -> 출발값 [1] ->  애니메이션이 끝날 때 최종값 
+                values.rect1X[0] = (objs.canvas.width - recalculatedInnerWidth) / 2;             // 이동 전 처음 세팅된 상태 
+                values.rect1X[1] = values.rect1X[0] - whiteRectWidth;
+                values.rect2X[0] = values.rect1X[0] + recalculatedInnerWidth - whiteRectWidth;   // 이동 전 처음 세팅된 상태 
+                values.rect2X[1] = values.rect2X[0] + whiteRectWidth;
+
+                // 캔버스는 default가 검정색이다. 
+                // fillRect 캔버스에서 사각형을 그리는 메소드 
+                // 좌우 흰색 박스 그리기          x             y        width                     height
+                // objs.context.fillRect(values.rect1X[0], 0, parseInt(whiteRectWidth), objs.canvas.height);
+                // objs.context.fillRect(values.rect2X[0], 0, parseInt(whiteRectWidth), objs.canvas.height);
+                
+                objs.context.fillRect(parseInt(calcValues(values.rect1X, currentYOffset)), 0, parseInt(whiteRectWidth), objs.canvas.height); // x값을 스크롤 값에 따라서 갱신되도록 
+                objs.context.fillRect(parseInt(calcValues(values.rect2X, currentYOffset)), 0, parseInt(whiteRectWidth), objs.canvas.height); // 애니메이션 처리 
+
+                // if 캔버스가 브러우저 상단에 닿지 않았다면
+                if(scrollRatio < values.rect1X[2].end) {
+                    step = 1;
+                    // console.log('캔버스 닿기 전 ')
+                    objs.canvas.classList.remove('sticky')
+                }else {
+                    step = 2;
+                    // console.log('캔버스 닿기 후 ')
+                    // 이미지 블렌드 
+                    //imageBlendY : [ 0, 0,{start:0, end :0}]
+                    // objs.context.drawImage(img, x, y, width, height);
+                    values.blendHeight[0] = 0;
+                    values.blendHeight[1] = objs.canvas.height;
+                    values.blendHeight[2].start = values.rect1X[2].end;
+                    values.blendHeight[2].end = values.blendHeight[2].start + 0.2;
+                    const blendHeight = calcValues(values.blendHeight, currentYOffset);
+
+                    // mdn drawImage 메소드 확인하기 
+                    objs.context.drawImage(objs.images[1],
+                        0, objs.canvas.height -blendHeight, objs.canvas.width, blendHeight,
+                        0, objs.canvas.height -blendHeight, objs.canvas.width, blendHeight
+                    );
+
+                    objs.canvas.classList.add('sticky');
+                    objs.canvas.style.top = `${-(objs.canvas.height - objs.canvas.height * canvasScaleRatio) / 2}px`;
+                    // 블렌드 이미지가 나타나는 시점 
+                    if(scrollRatio > values.blendHeight[2].end) {
+                        values.canvas_scale[0] = canvasScaleRatio;
+                        //                                                    1.5를 곱해준건 블렌드 이미지 크기를 줄이기 위해서 
+                        values.canvas_scale[1] = document.body.offsetWidth / (1.5 * objs.canvas.width);
+                        values.canvas_scale[2].start = values.blendHeight[2].end
+                        values.canvas_scale[2].end = values.canvas_scale[2].start + 0.2; 
+
+                        // 위 계산된 값을 calcValues로 스케일을 계산해서 적용  
+                        // currentYOffset은 현재 씬에서 얼마나 스크롤 했는지 결정하는 변수
+                        objs.canvas.style.transform = `scale(${calcValues(values.canvas_scale, currentYOffset)})`;
+                        // marginTop을 0으로 하는 이유는 스크롤을 다시 올렸을 때 이미지를 보여지도록 하기 위함
+                        objs.canvas.style.marginTop = 0;
+                    }
+                    // 블렌드 이미지의 position : fixed가 풀리는 지점 ( 스크롤 시작점)
+                    // 블렌드 이미지가 나타나는 시점의 조건 안에 values.canvas_scale[2].end가 0이기 때문에 따로 조건을 달아줘야 한다. 왜냐면 scrollRatio는 항상 0보다 큼
+                    if(scrollRatio > values.canvas_scale[2].end && values.canvas_scale[2].end > 0) 
+                        {
+                        objs.canvas.classList.remove('sticky');
+                        objs.canvas.style.marginTop = `${scrollHeight * 0.4}px`;
+
+                        values.canvasCaption_opacity[2].start = values.canvas_scale[2].end;
+                        values.canvasCaption_opacity[2].end = values.canvasCaption_opacity[2].start + 0.1;
+                        objs.canvasCaption.style.opacity = calcValues(values.canvasCaption_opacity, currentYOffset);
+
+                        values.canvasCaption_translateY[2].start = values.canvas_scale[2].end;
+                        values.canvasCaption_translateY[2].end = values.canvasCaption_opacity[2].start + 0.1;
+                        objs.canvasCaption.style.transform = `translate3d(0, ${calcValues(values.canvasCaption_translateY, currentYOffset)}%, 0)`
+                        }
+                        else {
+                            objs.canvasCaption.style.opacity = values.canvasCaption_opacity[0];
+                        }
+                    
+                    }
                 break;
         }
     }
@@ -335,6 +523,7 @@
     window.addEventListener('scroll', ()=> {
         yOffset = window.pageYOffset // 현재 스크롤 값 출력 
         scrollLoop(); 
+        checkMenu();
     });
     window.addEventListener('load', ()=> {
         setLayout();
