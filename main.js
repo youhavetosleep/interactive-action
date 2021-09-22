@@ -561,6 +561,8 @@
 
     });
     window.addEventListener('load', ()=> {
+        document.body.classList.remove('before-load');
+        
         setLayout();
         sceneInfo[0].objs.context.drawImage(sceneInfo[0].objs.videoImages[0], 0, 0); 
     });
@@ -575,6 +577,10 @@
     });
     //orientationchange 모바일 가로 세로 변경시에 일어나는 이벤트 
     window.addEventListener('orientationchange', setLayout);
+    //transitionend은 트렌지션이 끝나고 실행되는 메소드 
+    document.querySelector('.loading').addEventListener('transitionend', (e) => {
+        document.body.removeChild(e.currentTarget);
+    })
 
     setCanvasImages();
 
