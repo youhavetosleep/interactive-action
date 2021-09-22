@@ -4,6 +4,10 @@
     let preScrollHeight = 0 // 현재 스크롤 위치(yOffet)보다 이전에 위치한 스크롤 섹션들의 스크롤 높이값의 합
     let currentScene = 0 // 현재 활성화된 (눈 앞에 보고 있는) 씬 (scroll- section)
     let enterNewScene = false; // 새로운  scene이 시작되는 순간 true
+    let acc = 0.1 ; // 가속도 곱하는 변수 
+    let delayedYOffset = 0;
+    let rafId;
+    let rafState; 
 
     const sceneInfo = [
         {
@@ -151,7 +155,7 @@
         }
 
     }
-    setCanvasImages()
+
 
     function checkMenu() {
         // yOffset은 문서 전체에서 스크롤된 위치 (현재 스크롤된 위치)
@@ -229,8 +233,8 @@
         switch (currentScene) {
             case 0:
                 // console.log('0 play');
-                let sequence = Math.round(calcValues(values.imageSequence, currentYOffset));
-                objs.context.drawImage(objs.videoImages[sequence], 0, 0);
+                // let sequence = Math.round(calcValues(values.imageSequence, currentYOffset));
+                // objs.context.drawImage(objs.videoImages[sequence], 0, 0);
                 objs.canvas.style.opacity = calcValues(values.canvas_opacity, currentYOffset);
 
                 if (scrollRatio <= 0.22) {
@@ -277,8 +281,8 @@
     
             case 2:
                 // console.log('2 play');
-                let sequence2 = Math.round(calcValues(values.imageSequence, currentYOffset));
-                objs.context.drawImage(objs.videoImages[sequence2], 0, 0);
+                // let sequence2 = Math.round(calcValues(values.imageSequence, currentYOffset));
+                // objs.context.drawImage(objs.videoImages[sequence2], 0, 0);
 
                 if(scrollRatio <= 0.5 ) {
                     // in
@@ -501,12 +505,12 @@
             preScrollHeight += sceneInfo[i].scrollHeight;
         }
         
-        if(yOffset > preScrollHeight + sceneInfo[currentScene].scrollHeight) {
+        if(delayedYOffset > preScrollHeight + sceneInfo[currentScene].scrollHeight) {
             enterNewScene =true;
             currentScene++;
             document.body.setAttribute('id', `show-scene-${currentScene}`);
         }
-        if(yOffset < preScrollHeight) {
+        if(delayedYOffset < preScrollHeight) {
             enterNewScene =true;
             if(currentScene===0) return;
             currentScene--;
@@ -516,6 +520,30 @@
         playAnimation()
     }
 
+    function loop() {
+        delayedYOffset = delayedYOffset + (yOffset - delayedYOffset) * acc;
+        if(!enterNewScene) {
+            if( currentScene === 0 || currentScene === 2 ) {
+                const currentYOffset = delayedYOffset - preScrollHeight;
+                const objs = sceneInfo[currentScene].objs;
+                const values = sceneInfo[currentScene].values;
+            // playAnimation의 부분을 가져옴 
+            let sequence = Math.round(calcValues(values.imageSequence, currentYOffset));
+            if(objs.videoImages[sequence]) {
+                objs.context.drawImage(objs.videoImages[sequence], 0, 0);
+                }
+            }
+        }
+
+
+        rafId = requestAnimationFrame(loop); 
+
+        // 계속 연산되는 루프 함수를 멈추기 위한 조건 
+        if(Math.abs(yOffset - delayedYOffset) < 1 ) {
+            cancelAnimationFrame(rafId);
+            rafState = false;
+        }
+    }
 
 
 
@@ -524,13 +552,31 @@
         yOffset = window.pageYOffset // 현재 스크롤 값 출력 
         scrollLoop(); 
         checkMenu();
+
+        if(!rafState) {
+            rafId = requestAnimationFrame(loop);
+            rafState = true;
+        }
+
+
     });
     window.addEventListener('load', ()=> {
         setLayout();
         sceneInfo[0].objs.context.drawImage(sceneInfo[0].objs.videoImages[0], 0, 0); 
     });
     // window.addEventListener('DOMContentLoad', setLayout); 위와 같은 의미 
-    window.addEventListener('resize', setLayout);
+    window.addEventListener('resize', ()=> {
+        if(window.innerWidth > 900) {
+            setLayout();
+        }
+        // 창 리사이즈시 레이아웃이 안맞는 현상에 대처하기 위해 
+        // 리사이즈 될 때마다 rectStartY을 초기화 함 
+        sceneInfo[3].values.rectStartY = 0;
+    });
+    //orientationchange 모바일 가로 세로 변경시에 일어나는 이벤트 
+    window.addEventListener('orientationchange', setLayout);
+
+    setCanvasImages();
 
 })(); // 함수호출
 
